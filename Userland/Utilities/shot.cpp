@@ -7,9 +7,11 @@
 
 #include <AK/Format.h>
 #include <AK/Optional.h>
+#include <AK/URL.h>
 #include <LibCore/ArgsParser.h>
 #include <LibCore/DateTime.h>
 #include <LibCore/File.h>
+#include <LibDesktop/Launcher.h>
 #include <LibGUI/Application.h>
 #include <LibGUI/Clipboard.h>
 #include <LibGUI/Painter.h>
@@ -90,12 +92,14 @@ int main(int argc, char** argv)
 
     String output_path;
     bool output_to_clipboard = false;
+    bool open_in_image_viewer = false;
     unsigned delay = 0;
     bool select_region = false;
     int screen = -1;
 
     args_parser.add_positional_argument(output_path, "Output filename", "output", Core::ArgsParser::Required::No);
     args_parser.add_option(output_to_clipboard, "Output to clipboard", "clipboard", 'c');
+    args_parser.add_option(open_in_image_viewer, "Open the screenshot in Image Viewer after it's taken (ignored if --clipboard is present)", "open", 'o');
     args_parser.add_option(delay, "Seconds to wait before taking a screenshot", "delay", 'd', "seconds");
     args_parser.add_option(screen, "The index of the screen (default: -1 for all screens)", "screen", 's', "index");
     args_parser.add_option(select_region, "Select a region to capture", "region", 'r');
@@ -167,5 +171,12 @@ int main(int argc, char** argv)
     }
 
     outln("{}", output_path);
+
+    if (open_in_image_viewer) {
+        auto absolute_path = Core::File::absolute_path(output_path);
+        auto file_url = URL::create_with_file_protocol(absolute_path);
+        dbgln("Launcher succesfully opened IV: {}", Desktop::Launcher::open(file_url));
+    }
+
     return 0;
 }
