@@ -23,6 +23,7 @@
 #include <fcntl.h>
 #include <serenity.h>
 #include <spawn.h>
+#include <sys/wait.h>
 #include <unistd.h>
 
 namespace Assistant {
@@ -45,6 +46,26 @@ void CalculatorResult::activate() const
 void FileResult::activate() const
 {
     Desktop::Launcher::open(URL::create_with_file_protocol(title()));
+}
+
+void ScreenshotResult::activate() const
+{   
+    auto filename = title();
+
+    if (!filename.is_empty()) {
+        auto home_folder = Core::StandardPaths::home_directory();
+        filename = LexicalPath::join(home_folder, filename).string();
+    }
+
+    pid_t pid;
+    int status;
+    char const* argv[] = { "shot", "--region", "--open", filename.characters(), nullptr };
+
+    if ((errno = posix_spawn(&pid, "/bin/shot", nullptr, nullptr, const_cast<char**>(argv), environ)))
+        perror("posix_spawn");
+
+    if (waitpid(pid, &status, 0) < 0) 
+            perror("waitpid");
 }
 
 void TerminalResult::activate() const
@@ -202,6 +223,19 @@ void FileProvider::build_filesystem_cache()
         [this](auto) {
             m_building_cache = false;
         });
+}
+
+void ScreenshotProvider::query(String const& query, Function<void(NonnullRefPtrVector<Result>)> on_complete)
+{
+    if (!query.starts_with("shot"))
+        return;
+
+    // Take filename or auto-generate filename
+    auto filename = query.substring(4).trim_whitespace();
+
+    NonnullRefPtrVector<Result> results;
+    results.append(adopt_ref(*new ScreenshotResult(move(filename))));
+    on_complete(move(results));
 }
 
 void TerminalProvider::query(String const& query, Function<void(NonnullRefPtrVector<Result>)> on_complete)
